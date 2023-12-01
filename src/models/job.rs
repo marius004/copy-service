@@ -5,6 +5,7 @@ pub struct Job {
     pub source: &'static str,
     pub destination: &'static str,
     pub status: Arc<Mutex<JobStatus>>,
+    pub writes: u64, // nr. of successful writes to the destination file
 }
 
 #[derive(Debug, PartialEq)]
@@ -22,6 +23,7 @@ impl Job {
             source: source, 
             destination: destination,
             status: Arc::new(Mutex::new(JobStatus::Created)),
+            writes: 0,
         }
     }
 }

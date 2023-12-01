@@ -6,6 +6,7 @@ pub struct Config {
     pub working_directory: String,
     pub stdout_file: String,
     pub stderr_file: String,
+    pub buffer_size: usize,
 }
 
 impl Config {

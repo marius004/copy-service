@@ -1,17 +1,21 @@
+use std::io::SeekFrom;
 use std::{time::Duration, process};
-use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::fs::{File, OpenOptions};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader, BufWriter};
+use std::error::Error;
 use tokio::time;
 
-use crate::models;
+use crate::models::config::Config;
+use crate::models::job::Job;
+use crate::models::job::JobStatus;
 
 pub struct CopyService<'a> {
-    config: &'a models::config::Config, 
-    jobs: Vec<models::job::Job>,
+    config: &'a Config, 
+    jobs: Vec<Job>,
 }
 
 impl<'a> CopyService<'a> {
-    pub fn new(config: &'a models::config::Config) -> Self {
+    pub fn new(config: &'a Config) -> Self {
         CopyService {
             config,
             jobs: Vec::new(),
@@ -20,30 +24,26 @@ impl<'a> CopyService<'a> {
 
     pub async fn execute(&mut self) {
         let one_secs = Duration::from_secs(1);
+    
+        println!("pid: {}", process::id());
 
-        loop {
-            println!("pid: {}", process::id());
+        let mut job = Job::new(
+            "/home/smarius/Documents/main.c",
+            "/home/smarius/Documents/copy-service/copy.c",
+        );
 
-            let mut job = models::job::Job::new(
-                "/home/smarius/Documents/main.c",
-                "/home/smarius/Documents/copy-service/copy.c",
-            );
+        let result = self.execute_job(&mut job).await;
+        println!("{:?}", result);
 
-            let result = self.execute_job(&mut job).await;
-            println!("{:?}", result);
-
-            time::sleep(one_secs).await;
-        }
+        time::sleep(one_secs).await;
     }
 
-    async fn execute_job(&mut self, job: &mut models::job::Job) -> Result<String, Box<dyn std::error::Error>> {
-        let mut source = BufReader::new(File::open(&job.source).await?);
-        let mut destination = BufWriter::new(File::create(&job.destination).await?);
+    async fn execute_job(&mut self, job: &mut Job) -> Result<String, Box<dyn Error>> {
+        let mut source = self.source_reader(job).await?;
+        let mut destination = self.destination_writer(job).await?;
 
-        let mut buffer: Vec<u8> = vec![0; 4096];
+        let mut buffer: Vec<u8> = vec![0; self.config.buffer_size];
         while let Ok(bytes_read) = source.read(&mut buffer).await {
-            println!("{}", bytes_read);
-
             if bytes_read == 0 {
                 // TODO return stats
                 break;
@@ -54,11 +54,13 @@ impl<'a> CopyService<'a> {
                 // TODO handle error better
             }
 
+            job.writes += 1;
+
             let status = job.status.lock().unwrap();
-            if *status == models::job::JobStatus::Suspended {
+            if *status == JobStatus::Suspended {
                 // TODO replace this with something else
                 time::sleep(time::Duration::from_millis(100)).await;
-            } else if *status == models::job::JobStatus::Canceled {
+            } else if *status == JobStatus::Canceled {
                 // TODO replace this with something else
                 // should the destination file be discarded?
                 return Ok(String::from(""));
@@ -71,5 +73,35 @@ impl<'a> CopyService<'a> {
         destination.flush().await?;
 
         Ok(String::from(""))
+    }
+
+    async fn source_reader(&self, job: &Job) 
+        -> Result<BufReader<File>, Box<dyn Error>> {
+        match job.writes {
+            writes if writes > 0 => {
+                let offset = self.config.buffer_size as u64 * writes;
+                let mut source =
+                    OpenOptions::new()
+                        .read(true)
+                        .open(&job.source)
+                        .await?;
+                
+                source.seek(SeekFrom::Start(offset)).await?;
+                Ok(BufReader::new(source))
+            }, 
+            _ => Ok(BufReader::new(File::open(&job.source).await?))
+        }
+    }
+
+    async fn destination_writer(&self, job: &Job) 
+        -> Result<BufWriter<File>, Box<dyn Error>> {
+        let destination =
+            OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(&job.destination)
+                .await?;
+
+        Ok(BufWriter::new(destination))
     }
 }
