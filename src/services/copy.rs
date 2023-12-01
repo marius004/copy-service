@@ -8,6 +8,7 @@ use tokio::time;
 use crate::models::config::Config;
 use crate::models::job::Job;
 use crate::models::job::JobStatus;
+use crate::models::types::Action;
 
 pub struct CopyService<'a> {
     config: &'a Config, 
@@ -38,7 +39,7 @@ impl<'a> CopyService<'a> {
         time::sleep(one_secs).await;
     }
 
-    async fn execute_job(&mut self, job: &mut Job) -> Result<String, Box<dyn Error>> {
+    async fn execute_job(&mut self, job: &mut Job) -> Action<String> {
         let mut source = self.source_reader(job).await?;
         let mut destination = self.destination_writer(job).await?;
 
@@ -75,8 +76,7 @@ impl<'a> CopyService<'a> {
         Ok(String::from(""))
     }
 
-    async fn source_reader(&self, job: &Job) 
-        -> Result<BufReader<File>, Box<dyn Error>> {
+    async fn source_reader(&self, job: &Job) -> Action<BufReader<File>> {
         match job.writes {
             writes if writes > 0 => {
                 let offset = self.config.buffer_size as u64 * writes;
@@ -93,8 +93,7 @@ impl<'a> CopyService<'a> {
         }
     }
 
-    async fn destination_writer(&self, job: &Job) 
-        -> Result<BufWriter<File>, Box<dyn Error>> {
+    async fn destination_writer(&self, job: &Job) -> Action<BufWriter<File>> {
         let destination =
             OpenOptions::new()
                 .append(true)

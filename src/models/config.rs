@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use super::types::Action;
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub pid_file: String,
@@ -10,7 +12,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_file(path: &str) -> Action<Self> {
         let config_str = std::fs::read_to_string(path)?;
         toml::from_str(&config_str).map_err(Into::into)
     }
