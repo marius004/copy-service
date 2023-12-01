@@ -1,11 +1,13 @@
-#[derive(Debug)]
-pub struct Job {
-    source: &'static str,
-    destination: &'static str,
-    status: JobStatus,
-}
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
+pub struct Job {
+    pub source: &'static str,
+    pub destination: &'static str,
+    pub status: Arc<Mutex<JobStatus>>,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum JobStatus {
     Created,
     Running,
@@ -15,11 +17,11 @@ pub enum JobStatus {
 }
 
 impl Job {
-    fn new(source: &'static str, destination: &'static str) -> Self {
+    pub fn new(source: &'static str, destination: &'static str) -> Self {
         Job {
             source: source, 
             destination: destination,
-            status: JobStatus::Created,
+            status: Arc::new(Mutex::new(JobStatus::Created)),
         }
     }
 }

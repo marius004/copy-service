@@ -1,5 +1,6 @@
 use std::{fs::File, process};
 use daemonize::Daemonize;
+use tokio;
 
 mod services;
 mod models;
@@ -7,7 +8,8 @@ mod models;
 use models::config::Config;
 use services::copy::CopyService;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let config = match Config::from_file("./Config.toml") {
         Ok(cfg) => cfg,
         Err(err) => {
@@ -26,7 +28,7 @@ fn main() {
         .stderr(stderr);
 
     match daemonize.start() {
-        Ok(_) => CopyService::new(&config).execute(), 
-        Err(err) => eprintln!("Error, {}", err),
+        Ok(_) => {CopyService::new(&config).execute().await},
+        Err(err) => {eprintln!("Error, {}", err)},
     }
 }
