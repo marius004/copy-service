@@ -1,23 +1,11 @@
-use std::fs;
-use toml;
-use std::process;
+use std::{fs::File, process};
 use daemonize::Daemonize;
-use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
-struct Config {
-    pid_file: String,
-    working_directory: String,
-    stdout_file: String,
-    stderr_file: String,
-}
+mod services;
+mod models;
 
-impl Config {
-    fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let config_str = fs::read_to_string(path)?;
-        toml::from_str(&config_str).map_err(Into::into)
-    }
-}
+use models::config::Config;
+use services::copy::CopyService;
 
 fn main() {
     let config = match Config::from_file("./Config.toml") {
@@ -28,30 +16,17 @@ fn main() {
         }
     };
 
-    let stdout = fs::File::create(&config.stdout_file).unwrap();
-    let stderr = fs::File::create(&config.stderr_file).unwrap();
+    let stdout = File::create(&config.stdout_file).unwrap();
+    let stderr = File::create(&config.stderr_file).unwrap();
 
     let daemonize = Daemonize::new()
-        .pid_file(config.pid_file)
-        .working_directory(config.working_directory)
+        .pid_file(&config.pid_file)
+        .working_directory(&config.working_directory)
         .stdout(stdout)
         .stderr(stderr);
 
     match daemonize.start() {
-        Ok(v) => {
-            println!("{:?}", v);
-            println!("Success, daemonized");
-            run();
-        }
+        Ok(_) => CopyService::new(&config).execute(), 
         Err(err) => eprintln!("Error, {}", err),
-    }
-}
-
-fn run() {
-    let one_secs = std::time::Duration::from_secs(1);
-
-    loop {
-        println!("pid: {}", std::process::id());
-        std::thread::sleep(one_secs);
     }
 }
