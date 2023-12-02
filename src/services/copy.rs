@@ -1,25 +1,24 @@
-use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write, BufWriter, BufReader};
+use std::fs::{File, OpenOptions};
+use std_semaphore::Semaphore;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use anyhow::Result;
-use std::process;
 use std::thread;
-use std_semaphore::Semaphore;
 
 use crate::models::job::{Job, JobStatus};
 use crate::models::config::Config;
 
-pub struct CopyService<'a> {
-    config: &'a Config,
+pub struct CopyService {
+    config: Arc<Config>,
     jobs: Vec<Arc<RwLock<Job>>>,
     semaphore: Arc<Semaphore>,
 }
 
-impl<'a> CopyService<'a> {
-    pub fn new(config: &'a Config) -> Self {
+impl CopyService {
+    pub fn new(config: Config) -> Self {
         CopyService {
-            config,
+            config: Arc::new(config.clone()),
             jobs: Vec::new(),
             semaphore: Arc::new(Semaphore::new(config.max_threads as isize)),
         }
@@ -29,37 +28,34 @@ impl<'a> CopyService<'a> {
         self.jobs.push(Arc::new(RwLock::new(job)));
     }
 
-    pub fn execute(&mut self) {
-        println!("{}", process::id());
-        let mut handles = vec![];
+    pub fn execute(&mut self) { 
+        let handles: Vec<_> = 
+            self.jobs
+                .to_owned()
+                .into_iter()
+                .map(|job| {
+                    let (config_clone, job_clone, semaphore_clone) = (
+                        Arc::clone(&self.config),
+                        Arc::clone(&job),
+                        Arc::clone(&self.semaphore),
+                    );
 
-        for job in &self.jobs {
-            println!("{:?}", job);
+                    self.semaphore.acquire();
+                    thread::spawn(move || {
+                        let result = CopyService::execute_job(&config_clone, &job_clone);
+                        semaphore_clone.release();
+                        result
+                    })
+                })
+                .collect();
 
-            let config = self.config.clone();
-            let job_clone = Arc::clone(&job);
-            
-            let semaphore_clone = Arc::clone(&self.semaphore);            
-            semaphore_clone.acquire();
-
-            let handle = thread::spawn(move || {
-                let result = CopyService::execute_job(&config, &job_clone);
-                thread::sleep(std::time::Duration::from_secs(2)); // TODO remove
-                semaphore_clone.release();
-                result
+        handles
+            .into_iter()
+            .for_each(|handle| {
+                if let Some(error) = handle.join().err() {
+                    eprintln!("{:?}", error);
+                }
             });
-
-            handles.push(handle);
-        }
-
-        for handle in handles {
-            if let Err(err) = handle.join() {
-                eprintln!("Error in spawned thread: {:?}", err);
-                println!("Error in spawned thread: {:?}", err);
-            } else {
-                println!("Thread completed successfully");
-            }
-        }
     }
 
     fn execute_job(config: &Config, jlock: &Arc<RwLock<Job>>) -> Result<String> {

@@ -27,7 +27,7 @@ fn main() {
     
     match daemonize.start() {
         Ok(_) => {
-            let mut cs = CopyService::new(&config);
+            let mut cs = CopyService::new(config.clone());
             cs.add_job(Job::new("/home/smarius/Documents/main.c",
             "/home/smarius/Documents/copy-service/copy.c"));
 
