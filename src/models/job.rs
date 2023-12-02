@@ -15,7 +15,7 @@ pub enum JobStatus {
     Suspended,
     Completed,
     Canceled,
-    Failed,
+    Failed(String),
 }
 
 impl Job {
