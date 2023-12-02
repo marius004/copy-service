@@ -1,4 +1,5 @@
-use std::io::{Read, Seek, SeekFrom, Write, BufWriter, BufReader};
+use std::io::{Read, Seek, SeekFrom, 
+    Write, BufWriter, BufReader};
 use std::fs::{File, OpenOptions};
 use std_semaphore::Semaphore;
 use std::sync::{Arc, RwLock};
@@ -22,10 +23,6 @@ impl CopyService {
             jobs: Vec::new(),
             semaphore: Arc::new(Semaphore::new(config.max_threads as isize)),
         }
-    }
-
-    pub fn add_job(&mut self, job: Job) {
-        self.jobs.push(Arc::new(RwLock::new(job)));
     }
 
     pub fn execute(&mut self) { 
@@ -58,11 +55,11 @@ impl CopyService {
             });
     }
 
-    fn execute_job(config: &Config, jlock: &Arc<RwLock<Job>>) -> Result<String> {
-        let rjob = jlock.read().unwrap(); 
+    fn execute_job(config: &Config, job_lock: &Arc<RwLock<Job>>) -> Result<String> {
+        let job = job_lock.read().unwrap(); 
 
-        let mut source = CopyService::source_reader(config, &*rjob)?;
-        let mut destination = CopyService::destination_writer(&*rjob)?;
+        let mut source = CopyService::source_reader(config, &*job)?;
+        let mut destination = CopyService::destination_writer(&*job)?;
 
         let mut buffer: Vec<u8> = vec![0; config.buffer_size];
         while let Ok(bytes_read) = source.read(&mut buffer) {
@@ -77,10 +74,10 @@ impl CopyService {
                 // TODO handle error better
             }
 
-            if rjob.status == JobStatus::Suspended {
+            if job.status == JobStatus::Suspended {
                 // TODO replace this with something else
                 thread::sleep(Duration::from_millis(100));
-            } else if rjob.status == JobStatus::Canceled {
+            } else if job.status == JobStatus::Canceled {
                 // TODO replace this with something else
                 // should the destination file be discarded?
                 return Ok(String::from(""));
@@ -113,5 +110,9 @@ impl CopyService {
             .open(&job.destination)?;
 
         Ok(BufWriter::new(destination))
+    }
+
+    pub fn add_job(&mut self, job: Job) {
+        self.jobs.push(Arc::new(RwLock::new(job)));
     }
 }
