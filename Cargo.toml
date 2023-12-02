@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-tokio = { version = "1", features = ["full"] }
+std-semaphore = "0.1.0"
 daemonize = "0.5.0"
 anyhow = "1.0.75"
 toml = "0.8.8"

@@ -34,6 +34,12 @@ fn main() {
             cs.add_job(Job::new("/home/smarius/Documents/main.c",
             "/home/smarius/Documents/copy-service/copy2.c"));
 
+            cs.add_job(Job::new("/home/smarius/Documents/main.c",
+            "/home/smarius/Documents/copy-service/copy3.c"));
+
+            cs.add_job(Job::new("/home/smarius/Documents/main.c",
+            "/home/smarius/Documents/copy-service/copy4.c"));
+        
             cs.execute()
         },
         Err(err) => {eprintln!("Error, {}", err)},

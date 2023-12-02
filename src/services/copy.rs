@@ -5,6 +5,7 @@ use std::time::Duration;
 use anyhow::Result;
 use std::process;
 use std::thread;
+use std_semaphore::Semaphore;
 
 use crate::models::job::{Job, JobStatus};
 use crate::models::config::Config;
@@ -12,6 +13,7 @@ use crate::models::config::Config;
 pub struct CopyService<'a> {
     config: &'a Config,
     jobs: Vec<Arc<RwLock<Job>>>,
+    semaphore: Arc<Semaphore>,
 }
 
 impl<'a> CopyService<'a> {
@@ -19,6 +21,7 @@ impl<'a> CopyService<'a> {
         CopyService {
             config,
             jobs: Vec::new(),
+            semaphore: Arc::new(Semaphore::new(config.max_threads as isize)),
         }
     }
 
@@ -34,10 +37,15 @@ impl<'a> CopyService<'a> {
             println!("{:?}", job);
 
             let config = self.config.clone();
-            let job_clone = Arc::clone(job);
+            let job_clone = Arc::clone(&job);
+            
+            let semaphore_clone = Arc::clone(&self.semaphore);            
+            semaphore_clone.acquire();
 
             let handle = thread::spawn(move || {
                 let result = CopyService::execute_job(&config, &job_clone);
+                thread::sleep(std::time::Duration::from_secs(2)); // TODO remove
+                semaphore_clone.release();
                 result
             });
 
@@ -55,7 +63,7 @@ impl<'a> CopyService<'a> {
     }
 
     fn execute_job(config: &Config, jlock: &Arc<RwLock<Job>>) -> Result<String> {
-        let rjob = jlock.read().unwrap(); // Obtain a lock to the job
+        let rjob = jlock.read().unwrap(); 
 
         let mut source = CopyService::source_reader(config, &*rjob)?;
         let mut destination = CopyService::destination_writer(&*rjob)?;
@@ -86,7 +94,6 @@ impl<'a> CopyService<'a> {
         // todo: update the status of the job
         // todo: don't forget to flush the buffers also when returning
         destination.flush()?;
-
         Ok(String::from(""))
     }
 
