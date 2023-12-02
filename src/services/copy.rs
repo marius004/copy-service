@@ -2,7 +2,7 @@ use std::io::{Read, Seek, SeekFrom,
     Write, BufWriter, BufReader};
 use std::fs::{File, OpenOptions};
 use std_semaphore::Semaphore;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 use anyhow::Result;
 use std::thread;
@@ -12,7 +12,7 @@ use crate::models::config::Config;
 
 pub struct CopyService {
     config: Arc<Config>,
-    jobs: Vec<Arc<RwLock<Job>>>,
+    jobs: Vec<Arc<Job>>,
     semaphore: Arc<Semaphore>,
 }
 
@@ -49,19 +49,19 @@ impl CopyService {
         handles
             .into_iter()
             .for_each(|handle| {
-                if let Some(error) = handle.join().err() {
-                    eprintln!("{:?}", error);
+                match handle.join() {
+                    Ok(_) => println!("{:#?}", self.jobs),
+                    Err(error) => eprintln!("{:?}", error)
                 }
             });
     }
 
-    fn execute_job(config: &Config, job_lock: &Arc<RwLock<Job>>) -> Result<String> {
-        let job = job_lock.read().unwrap(); 
-
-        let mut source = CopyService::source_reader(config, &*job)?;
-        let mut destination = CopyService::destination_writer(&*job)?;
+    fn execute_job(config: &Config, job: &Arc<Job>) -> Result<String> {
+        let mut source = CopyService::source_reader(config, job)?;
+        let mut destination = CopyService::destination_writer(job)?;
 
         let mut buffer: Vec<u8> = vec![0; config.buffer_size];
+        
         while let Ok(bytes_read) = source.read(&mut buffer) {
             println!("Bytes read {}", bytes_read);
             if bytes_read == 0 {
@@ -72,12 +72,15 @@ impl CopyService {
             if let Err(err) = destination.write_all(&buffer[..bytes_read]) {
                 eprintln!("Error writing to destination: {}", err);
                 // TODO handle error better
+            } else {
+                let mut writes = job.writes.write().unwrap(); 
+                *writes += 1;
             }
-
-            if job.status == JobStatus::Suspended {
+            
+            if *job.status.read().unwrap() == JobStatus::Suspended {
                 // TODO replace this with something else
                 thread::sleep(Duration::from_millis(100));
-            } else if job.status == JobStatus::Canceled {
+            } else if *job.status.read().unwrap() == JobStatus::Canceled {
                 // TODO replace this with something else
                 // should the destination file be discarded?
                 return Ok(String::from(""));
@@ -91,7 +94,7 @@ impl CopyService {
     }
 
     fn source_reader(config: &Config, job: &Job) -> Result<BufReader<File>> {
-        match job.writes {
+        match *job.writes.read().unwrap() {
             writes if writes > 0 => {
                 let offset = config.buffer_size as u64 * writes;
                 let mut source = OpenOptions::new().read(true).open(&job.source)?;
@@ -113,6 +116,6 @@ impl CopyService {
     }
 
     pub fn add_job(&mut self, job: Job) {
-        self.jobs.push(Arc::new(RwLock::new(job)));
+        self.jobs.push(Arc::new(job));
     }
 }

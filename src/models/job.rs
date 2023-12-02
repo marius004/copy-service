@@ -1,9 +1,11 @@
+use std::sync::{Arc, RwLock};
+
 #[derive(Debug)]
 pub struct Job {
     pub source: &'static str,
     pub destination: &'static str,
-    pub status: JobStatus,
-    pub writes: u64, // nr. of successful writes to the destination file
+    pub status: Arc<RwLock<JobStatus>>,
+    pub writes: Arc<RwLock<u64>>, // nr. of successful writes to the destination file
 }
 
 #[derive(Debug, PartialEq)]
@@ -21,8 +23,8 @@ impl Job {
         Job {
             source: source, 
             destination: destination,
-            status: JobStatus::Created,
-            writes: 0,
+            status: Arc::new(RwLock::new(JobStatus::Created)),
+            writes: Arc::new(RwLock::new(0u64)),
         }
     }
 }
