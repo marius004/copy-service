@@ -1,10 +1,8 @@
-use std::sync::{Arc, Mutex};
-
 #[derive(Debug)]
 pub struct Job {
     pub source: &'static str,
     pub destination: &'static str,
-    pub status: Arc<Mutex<JobStatus>>,
+    pub status: JobStatus,
     pub writes: u64, // nr. of successful writes to the destination file
 }
 
@@ -15,6 +13,7 @@ pub enum JobStatus {
     Suspended,
     Completed,
     Canceled,
+    Failed,
 }
 
 impl Job {
@@ -22,7 +21,7 @@ impl Job {
         Job {
             source: source, 
             destination: destination,
-            status: Arc::new(Mutex::new(JobStatus::Created)),
+            status: JobStatus::Created,
             writes: 0,
         }
     }

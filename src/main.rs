@@ -1,15 +1,13 @@
 use std::{fs::File, process};
 use daemonize::Daemonize;
-use tokio;
 
 mod services;
 mod models;
 
-use models::config::Config;
+use models::{config::Config, job::Job};
 use services::copy::CopyService;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let config = match Config::from_file("./Config.toml") {
         Ok(cfg) => cfg,
         Err(err) => {
@@ -26,9 +24,18 @@ async fn main() {
         .working_directory(&config.working_directory)
         .stdout(stdout)
         .stderr(stderr);
-
+    
     match daemonize.start() {
-        Ok(_) => {CopyService::new(&config).execute().await},
+        Ok(_) => {
+            let mut cs = CopyService::new(&config);
+            cs.add_job(Job::new("/home/smarius/Documents/main.c",
+            "/home/smarius/Documents/copy-service/copy.c"));
+
+            cs.add_job(Job::new("/home/smarius/Documents/main.c",
+            "/home/smarius/Documents/copy-service/copy2.c"));
+
+            cs.execute()
+        },
         Err(err) => {eprintln!("Error, {}", err)},
     }
 }
