@@ -1,4 +1,4 @@
-use std::{fs::File, process};
+use std::{fs::File, process, collections::HashSet};
 use daemonize::Daemonize;
 
 mod services;
@@ -28,17 +28,15 @@ fn main() {
     match daemonize.start() {
         Ok(_) => {
             let mut cs = CopyService::new(config.clone());
-            cs.add_job(Job::new("/home/smarius/Documents/main.c",
-            "/home/smarius/Documents/copy-service/copy.c"));
+            cs.add_job(Job::new("/home/smarius/Documents/main.c".to_string(),
+            "/home/smarius/Documents/copy-service/copy.c".to_string(), 
+            None, 
+            HashSet::new()));
 
-            cs.add_job(Job::new("/home/smarius/Documents/main.c",
-            "/home/smarius/Documents/copy-service/copy2.c"));
-
-            cs.add_job(Job::new("/home/smarius/Documents/main.c",
-            "/home/smarius/Documents/copy-service/copy3.c"));
-
-            cs.add_job(Job::new("/home/smarius/Documents/main.c",
-            "/home/smarius/Documents/copy-service/copy4.c"));
+            cs.add_job(Job::new("/home/smarius/Documents/bot".to_string(),
+            "/home/smarius/Documents/copy-service/temp".to_string(),
+            None,
+            HashSet::new()));
         
             cs.execute()
         },

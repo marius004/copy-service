@@ -1,6 +1,8 @@
+use std::collections::HashSet;
 use std::io::{Read, Seek, SeekFrom, 
     Write, BufWriter, BufReader};
-use std::fs::{File, OpenOptions};
+use std::fs::{File, OpenOptions, metadata};
+use std::path::Path;
 use std_semaphore::Semaphore;
 use std::sync::Arc;
 use std::time::Duration;
@@ -58,9 +60,21 @@ impl CopyService {
     }
 
     fn execute_job(config: &Config, job: &Arc<Job>) -> Result<CopyStats> {
+        // create all destination directories 
+        for dir_path in &job.destination_dirs {
+            println!("Destination {}", dir_path);
+            
+            if let Err(err) = std::fs::create_dir_all(dir_path) {
+                if err.kind() != std::io::ErrorKind::AlreadyExists {
+                    eprintln!("Error creating directory {}: {}", dir_path, err);
+                    return Err(err.into());
+                }
+            }
+        }
+        
         let mut source = CopyService::source_reader(config, job.clone())?;
         let mut destination = CopyService::destination_writer(job.clone())?;
-
+        
         let mut buffer: Vec<u8> = vec![0; config.buffer_size];
         while let Ok(bytes_read) = source.read(&mut buffer) {
             if bytes_read == 0 {
@@ -110,6 +124,77 @@ impl CopyService {
         Ok(BufWriter::new(destination))
     }
 
+    fn subjobs(job: Arc<Job>) -> Vec<Arc<Job>> {
+        if CopyService::is_file(&job.source) {
+            return vec![job];
+        }
+
+        let source_paths = CopyService::visit_directory(Path::new(&job.source));
+        let mut destination_dirs: HashSet<String> = source_paths
+            .clone()
+            .into_iter()
+            .filter_map(|path| {
+              if CopyService::is_dir(&path) {
+                Some(path.replace(&job.source, &job.destination))
+              } else {
+                None 
+              } 
+            })
+            .collect();
+
+        destination_dirs.insert(job.destination.clone());
+
+        let subjobs: Vec<Arc<Job>> = source_paths
+            .iter()
+            .map(|path| {
+                let destination = path.replace(&job.source, &job.destination);
+                Arc::new(Job::new(
+                    path.to_owned(), 
+                    destination.clone(), 
+                    Some(job.clone()), 
+                    destination_dirs.clone()))
+            })
+            .collect();
+
+        subjobs
+    }
+
+    fn visit_directory(directory: &Path) -> Vec<String> {
+        std::fs::read_dir(directory)
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| {
+                match entry {
+                    Ok(entry) => {
+                        let path = entry.path();
+                        match path.is_file() {
+                            true => Some(vec![path.to_str().unwrap().to_string()]),
+                            false if path.is_dir() => Some(CopyService::visit_directory(&path)),
+                            _ => None,
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("Unexpected error during directory walk, {}", err);
+                        None
+                    }
+                }
+            })
+            .flatten()
+            .collect()
+    }
+        
+    fn is_file(path: &str) -> bool {
+        metadata(path)
+            .map(|metadata| metadata.is_file())
+            .unwrap_or(false)
+    }
+
+    fn is_dir(path: &str) -> bool {
+        metadata(path)
+            .map(|metadata| metadata.is_dir())
+            .unwrap_or(false)
+    }
+
     fn update_job_status(job: Arc<Job>, new_status: JobStatus) {
         let mut status = job.status.write().unwrap();
         *status = new_status;
@@ -120,8 +205,9 @@ impl CopyService {
         *writes += 1;
     }
 
-    // TODO remove this when other way of communication will be implemented
     pub fn add_job(&mut self, job: Job) {
-        self.jobs.push(Arc::new(job));
+        for subjob in CopyService::subjobs(Arc::new(job)) {
+            self.jobs.push(subjob);   
+        }
     }
 }
