@@ -4,6 +4,7 @@ use std::io::Read;
 use crate::models::config::Config;
 use crate::services::copy::CopyService;
 use crate::client::requests::*;
+use crate::client::handlers::*;
 
 pub struct Client {
     config: Config,
@@ -18,7 +19,7 @@ impl Client {
         }
     }
 
-    pub fn listen(&self) {
+    pub fn listen(&mut self) {
         let listener = TcpListener::bind("127.0.0.1:8080").expect("Failed to bind to address");
         for stream in listener.incoming() {
             match stream {
@@ -28,8 +29,8 @@ impl Client {
         }
     }
 
-    fn handle_connection(&self, mut stream: TcpStream) {
-        // todo: change this with some resizable structure.
+    fn handle_connection(&mut self, mut stream: TcpStream) {
+        // todo: change this with some resizable container
         let mut buffer = vec![0u8; 4096];
 
         while let Ok(bytes_read) = stream.read(&mut buffer) {
@@ -38,10 +39,26 @@ impl Client {
             }
 
             let request = String::from_utf8_lossy(&buffer[..bytes_read]);
-            println!("Received message: {}", request);
-
-            let parsed = parse_request(&request.into_owned());
-            println!("{:?}", parsed);
+            println!("{:?}", self.handle_request(&request));
         }
     }
-} 
+
+    fn handle_request(&mut self, request: &str) -> Option<String> {
+        match parse_request(request) {
+            Ok(parsed_request) => {
+                let response = match parsed_request {
+                    AnyRequest::Copy(copy_request) => 
+                        handle_copy(copy_request, &mut self.copy_service),
+                    AnyRequest::Suspend(suspend_request) => (),
+                    AnyRequest::Cancel(cancel_request) => (),
+                    AnyRequest::Progress(progress_request) => (),
+                    AnyRequest::List(list_request) => (),
+                };
+
+                // todo
+                Some("".to_owned())
+            }
+            Err(_) => None,
+        }
+    }
+}
