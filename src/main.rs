@@ -1,11 +1,15 @@
-use std::{fs::File, process, collections::HashSet};
+use std::{
+    fs::File,
+    process,
+};
 use daemonize::Daemonize;
 
 mod services;
 mod models;
+mod client;
 
-use models::{config::Config, job::Job};
-use services::copy::CopyService;
+use models::config::Config;
+use client::client::Client;
 
 fn main() {
     let config = match Config::from_file("./Config.toml") {
@@ -24,22 +28,9 @@ fn main() {
         .working_directory(&config.working_directory)
         .stdout(stdout)
         .stderr(stderr);
-    
-    match daemonize.start() {
-        Ok(_) => {
-            let mut cs = CopyService::new(config.clone());
-            cs.add_job(Job::new("/home/smarius/Documents/main.c".to_string(),
-            "/home/smarius/Documents/copy-service/copy.c".to_string(), 
-            None, 
-            HashSet::new()));
 
-            cs.add_job(Job::new("/home/smarius/Documents/bot".to_string(),
-            "/home/smarius/Documents/copy-service/temp".to_string(),
-            None,
-            HashSet::new()));
-        
-            cs.execute()
-        },
-        Err(err) => {eprintln!("Error, {}", err)},
+    match daemonize.start() {
+        Ok(_) => Client::new(config).listen(),
+        Err(err) => eprintln!("Error, {}", err),
     }
 }
