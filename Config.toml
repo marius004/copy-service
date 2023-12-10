@@ -3,5 +3,5 @@ working_directory = "./daemon"
 stdout_file = "./daemon/daemon.out"
 stderr_file = "./daemon/daemon.err"
 
-buffer_size = 4096
-max_threads = 2
+buffer_size = 128
+max_threads = 5

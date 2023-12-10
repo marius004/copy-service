@@ -33,7 +33,7 @@ pub struct SuspendJobRequest {
     #[serde(flatten)]
     pub base: JobRequest,
 
-    pub job_id: usize,
+    pub job_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,7 +41,7 @@ pub struct CancelJobRequest {
     #[serde(flatten)]
     pub base: JobRequest,
 
-    pub job_id: usize,
+    pub job_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -49,7 +49,7 @@ pub struct ProgressJobRequest {
     #[serde(flatten)]
     pub base: JobRequest,
 
-    pub job_id: usize,
+    pub job_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

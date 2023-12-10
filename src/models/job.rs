@@ -1,7 +1,10 @@
 use std::{sync::{Arc, RwLock}, collections::HashSet};
+use serde::{Serialize, Deserialize};
+use uuid::Uuid;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Job {
+    pub id: Uuid,
     pub source: String,
     pub destination: String,
     pub status: Arc<RwLock<JobStatus>>,
@@ -11,14 +14,14 @@ pub struct Job {
     pub destination_dirs: HashSet<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum JobStatus {
     Created,
     Running,
     Suspended,
     Completed,
     Canceled,
-    Failed(String),
+    Failed(&'static str),
 }
 
 impl Job {
@@ -26,6 +29,7 @@ impl Job {
         parent: Option<Arc<Job>>, 
         destination_dirs: HashSet<String>) -> Self {
         Job {
+            id: Uuid::new_v4(),
             source: source, 
             destination: destination,
             status: Arc::new(RwLock::new(JobStatus::Created)),

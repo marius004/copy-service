@@ -5,8 +5,8 @@ use super::job::Job;
 
 #[derive(Debug)]
 pub struct CopyStats {
-    job: Arc<Job>,
-    time: Duration,
+    pub job: Arc<Job>,
+    pub time: Duration,
 }
 
 impl CopyStats {

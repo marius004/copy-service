@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    process,
+    process, sync::{mpsc::channel, Arc, RwLock, Mutex}, thread,
 };
 use daemonize::Daemonize;
 
@@ -8,8 +8,24 @@ mod services;
 mod models;
 mod client;
 
-use models::config::Config;
+use models::{config::Config, job::Job};
 use client::client::Client;
+use services::{storage::StorageService, copy::CopyService};
+
+fn run(config: Arc<Config>) {
+    let (sender, receiver) = channel::<Job>();
+    
+    let storage_service = Arc::new(RwLock::new(StorageService::new()));
+    let copy_service =  Arc::new(RwLock::new(CopyService::new(config, Mutex::new(receiver), storage_service.clone())));
+    let client_service = Arc::new(Mutex::new(Client::new(storage_service.clone(), sender)));
+
+    let client_handle = thread::spawn(move || {
+        client_service.lock().unwrap().listen();
+    });
+
+    copy_service.write().unwrap().execute();
+    client_handle.join().unwrap();
+}
 
 fn main() {
     let config = match Config::from_file("./Config.toml") {
@@ -30,7 +46,7 @@ fn main() {
         .stderr(stderr);
 
     match daemonize.start() {
-        Ok(_) => Client::new(config).listen(),
+        Ok(_) => run(Arc::new(config)),
         Err(err) => eprintln!("Error, {}", err),
     }
 }

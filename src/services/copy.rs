@@ -1,65 +1,62 @@
+use std::sync::mpsc::Receiver;
 use std::collections::HashSet;
-use std::io::{Read, Seek, SeekFrom, 
-    Write, BufWriter, BufReader};
+use std::io::{Read, Seek, SeekFrom, Write, BufWriter, BufReader};
 use std::fs::{File, OpenOptions, metadata};
 use std::path::Path;
-use std_semaphore::Semaphore;
-use std::sync::Arc;
 use std::time::Duration;
 use anyhow::Result;
-use std::thread;
-
+use threadpool::ThreadPool;
+use crate::services::storage::StorageService;
 use crate::models::job::{Job, JobStatus};
 use crate::models::copy::CopyStats;
 use crate::models::config::Config;
+use std::sync::{Arc, RwLock, Mutex};
 
 pub struct CopyService {
     config: Arc<Config>,
-    jobs: Vec<Arc<Job>>,
-    semaphore: Arc<Semaphore>,
+    storage: Arc<RwLock<StorageService>>,
+    receiver: Mutex<Receiver<Job>>,
+    workers: ThreadPool,
 }
 
 impl CopyService {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Arc<Config>, receiver: Mutex<Receiver<Job>>, storage: Arc<RwLock<StorageService>>) -> Self {
+        let workers = ThreadPool::new(config.max_threads as usize);
+
         CopyService {
-            config: Arc::new(config.clone()),
-            jobs: Vec::new(),
-            semaphore: Arc::new(Semaphore::new(config.max_threads as isize)),
+            config: config,
+            receiver: receiver,
+            storage: storage,
+            workers: workers, 
         }
     }
 
-    pub fn execute(&mut self) { 
-        let handles: Vec<_> = 
-            self.jobs
-                .to_owned()
-                .into_iter()
-                .map(|job| {
-                    let (config_clone, job_clone, semaphore_clone) = (
-                        Arc::clone(&self.config),
-                        Arc::clone(&job),
-                        Arc::clone(&self.semaphore),
-                    );
+    pub fn execute(&mut self) {
+        loop {
+            if let Ok(data) = self.receiver.lock().unwrap().try_recv() {
+                let job = self.storage.write().unwrap().add_job(data);
+                let config_clone = Arc::clone(&self.config);
 
-                    self.semaphore.acquire();
-                    thread::spawn(move || {
-                        let result = CopyService::execute_job(&config_clone, &job_clone);
-                        semaphore_clone.release();
-                        result
-                    })
-                })
-                .collect();
-
-        handles
-            .into_iter()
-            .for_each(|handle| {
-                match handle.join() {
-                    Ok(result) => println!("{:#?}", result),
-                    Err(error) => eprintln!("{:?}", error)
-                }
-            });
+                self.workers.execute(move || {
+                    let result = CopyService::execute_job(&config_clone, job);
+                    match result {
+                        Ok(stats) => {
+                            println!("{:#?}", stats);
+                            let mut job_status = stats.job.status.write().unwrap();
+                            *job_status = JobStatus::Completed;
+                        }
+                        Err(err) => {
+                            // todo: handle error
+                            eprintln!("Unexpected error, {}", err);
+                            // *job_status = JobStatus::Failed(err.to_string());
+                        }
+                    }
+                });
+            }
+        }
     }
-
-    fn execute_job(config: &Config, job: &Arc<Job>) -> Result<CopyStats> {
+    
+    fn execute_job(config: &Arc<Config>, job: Arc<Job>) -> Result<CopyStats> {
         // create all destination directories 
         for dir_path in &job.destination_dirs {
             println!("Destination {}", dir_path);
@@ -73,9 +70,9 @@ impl CopyService {
         }
         
         let mut source = CopyService::source_reader(config, job.clone())?;
-        let mut destination = CopyService::destination_writer(job.clone())?;
+        let mut destination = CopyService::destination_writer(&job.clone())?;
         
-        let mut buffer: Vec<u8> = vec![0; config.buffer_size];
+        let mut buffer: Vec<u8> = vec![0; config.buffer_size.clone()];
         while let Ok(bytes_read) = source.read(&mut buffer) {
             if bytes_read == 0 {
                 break;
@@ -83,10 +80,8 @@ impl CopyService {
 
             match destination.write_all(&buffer[..bytes_read]) {
                 Ok(_) => CopyService::increase_job_writes(job.clone()),
-                Err(err) => {
-                    let error_message = format!("Error writing to destination file, {}", err.to_string());
-                    CopyService::update_job_status(job.clone(), JobStatus::Failed(error_message));
-
+                Err(_) => {
+                    CopyService::update_job_status(job.clone(), JobStatus::Failed("Error writing to destination file"));
                     return Ok(CopyStats::new(job.clone(), Duration::from_secs(0)));
                 },
             }
@@ -102,7 +97,7 @@ impl CopyService {
         Ok(CopyStats::new(job.clone(), Duration::from_secs(0)))
     }
 
-    fn source_reader(config: &Config, job: Arc<Job>) -> Result<BufReader<File>> {
+    fn source_reader(config: &Arc<Config>, job: Arc<Job>) -> Result<BufReader<File>> {
         match *job.writes.read().unwrap() {
             writes if writes > 0 => {
                 let offset = config.buffer_size as u64 * writes;
@@ -115,7 +110,7 @@ impl CopyService {
         }
     }
 
-    fn destination_writer(job: Arc<Job>) -> Result<BufWriter<File>> {
+    fn destination_writer(job: &Arc<Job>) -> Result<BufWriter<File>> {
         let destination = OpenOptions::new()
             .append(true)
             .create(true)
@@ -203,11 +198,5 @@ impl CopyService {
     fn increase_job_writes(job: Arc<Job>) {
         let mut writes = job.writes.write().unwrap(); 
         *writes += 1;
-    }
-
-    pub fn add_job(&mut self, job: Job) {
-        for subjob in CopyService::subjobs(Arc::new(job)) {
-            self.jobs.push(subjob);   
-        }
     }
 }

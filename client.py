@@ -15,7 +15,14 @@ operations = {
         "source_path": "", 
         "destination_path": ""
     }
+    ''',
+    "list": '''
+    {
+        "request_type": "list"
+    }
     '''
 }
 
 send_message(operations["copy"])
+for i in range(0, 60):
+    send_message(operations["list"])
