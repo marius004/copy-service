@@ -1,13 +1,11 @@
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
-use std::thread;
 
 use crate::client::handlers::*;
 use crate::client::requests::*;
 use crate::models::job::Job;
-use crate::services::copy::CopyService;
 use crate::services::storage::StorageService;
 
 pub struct Client {
@@ -27,13 +25,13 @@ impl Client {
         let listener = TcpListener::bind("127.0.0.1:8080").expect("Failed to bind to address");
         for stream in listener.incoming() {
             match stream {
-                Ok(stream) => self.handle_connection(stream),
+                Ok(stream) => self.handle_stream(stream),
                 Err(e) => eprintln!("Error accepting connection: {}", e),
             }
         }
     }
 
-    fn handle_connection(&self, mut stream: TcpStream) {
+    fn handle_stream(&self, mut stream: TcpStream) {
         // todo: change this with some resizable container
         let mut buffer = vec![0u8; 4096];
 
@@ -43,7 +41,7 @@ impl Client {
             }
 
             let request = String::from_utf8_lossy(&buffer[..bytes_read]);
-            println!("{:?}", self.handle_request(&request));
+            self.send_response(&mut stream,&self.handle_request(&request));
         }
     }
 
@@ -72,5 +70,13 @@ impl Client {
         };
 
         response
+    }
+
+    fn send_response(&self, stream: &mut TcpStream, response: &Option<String>) {
+        if let Some(response_str) = response {
+            if let Err(err) = stream.write_all(response_str.as_bytes()) {
+                eprintln!("Error sending response: {}", err);
+            }
+        }
     }
 }
