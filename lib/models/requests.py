@@ -40,7 +40,7 @@ class SuspendOperation(BaseOperation):
         return OperationType.SUSPEND
 
     def repr(self) -> str:
-        return f'{{"request_type": "suspend", "job_id": {self.job_id}}}'
+        return f'{{"request_type": "suspend", "job_id": "{self.job_id}"}}'
 
 @dataclass
 class CancelOperation(BaseOperation):
@@ -51,7 +51,7 @@ class CancelOperation(BaseOperation):
         return OperationType.CANCEL
 
     def repr(self) -> str:
-        return f'{{"request_type": "cancel", "job_id": {self.job_id}}}'
+        return f'{{"request_type": "cancel", "job_id": "{self.job_id}"}}'
     
 @dataclass
 class ProgressOperation(BaseOperation):
@@ -62,7 +62,7 @@ class ProgressOperation(BaseOperation):
         return OperationType.PROGRESS
 
     def repr(self) -> str:
-        return f'{{"request_type": "progress", "job_id": {self.job_id}}}'
+        return f'{{"request_type": "progress", "job_id": "{self.job_id}"}}'
 
 @dataclass
 class ListOperation(BaseOperation):

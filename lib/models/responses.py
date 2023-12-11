@@ -52,14 +52,11 @@ class JobResponse(BaseResponse):
     status: str
     writes: str
     
-    
     @staticmethod
     def from_json(obj: dict, type: ResponseType) -> 'JobResponse':
-        if "error" in obj.get("message", "").lower(): 
-            return JobResponse(type=type, error=obj["message"])
         return JobResponse(
             type=type,
-            error=None,
+            error=obj.get('message', None),
             id=obj.get('id', None),
             source=obj.get('source', None),
             destination=obj.get('destination', None),
