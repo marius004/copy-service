@@ -56,4 +56,13 @@ impl StorageService {
         job_arc
     }
 
+    pub fn increment_job_writes(job: Arc<Job>) {
+        let mut writes = job.writes.write().unwrap(); 
+        *writes += 1;
+    }
+
+    pub fn update_job_status(job: Arc<Job>, new_status: JobStatus) {
+        let mut status = job.status.write().unwrap();
+        *status = new_status;
+    }
 }

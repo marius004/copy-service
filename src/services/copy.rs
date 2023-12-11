@@ -1,17 +1,14 @@
 use std::io::{Read, Seek, SeekFrom, Write, BufWriter, BufReader};
-use std::fs::{File, OpenOptions, metadata};
+use std::fs::{File, OpenOptions};
 use std::sync::{Arc, RwLock, Mutex};
 use std::sync::mpsc::Receiver;
-use std::collections::HashSet;
 use anyhow::{Result, anyhow};
 use threadpool::ThreadPool;
 use std::time::Duration;
-use std::path::Path;
 use std::thread;
 
 use crate::services::storage::StorageService;
 use crate::models::job::{Job, JobStatus};
-use crate::models::copy::CopyStats;
 use crate::models::config::Config;
 use crate::services::validate::validate;
 
@@ -42,44 +39,34 @@ impl CopyService {
 
                 self.workers.execute(move || {
                     if let Err(err) = CopyService::execute_job(&config_clone, job.clone()) {
-                        CopyService::update_job_status(job, JobStatus::Failed(err.to_string()));
+                        StorageService::update_job_status(job, JobStatus::Failed(err.to_string()));
                     }
                 });
             }
         }
     }
     
-    fn execute_job(config: &Arc<Config>, job: Arc<Job>) -> Result<CopyStats> {
-        CopyService::update_job_status(job.clone(), JobStatus::Running);
-
+    fn execute_job(config: &Arc<Config>, job: Arc<Job>) -> Result<Arc<Job>> {
+        StorageService::update_job_status(job.clone(), JobStatus::Running);
         if let(false, message) = validate(job.clone()) {
             return Err(anyhow!(message));
         }
 
-        // create all destination directories 
-        for dir_path in &job.destination_dirs {
-            if let Err(err) = std::fs::create_dir_all(dir_path) {
-                if err.kind() != std::io::ErrorKind::AlreadyExists {
-                    return Err(err.into());
-                }
-            }
-        }
-        
         let mut source = CopyService::source_reader(config, job.clone())?;
         let mut destination = CopyService::destination_writer(&job.clone())?;
         
         let mut buffer: Vec<u8> = vec![0; config.buffer_size.clone()];
         while let Ok(bytes_read) = source.read(&mut buffer) {
             if bytes_read == 0 {
-                CopyService::update_job_status(job.clone(), JobStatus::Completed);
+                StorageService::update_job_status(job.clone(), JobStatus::Completed);
                 break;
             }
 
             match destination.write_all(&buffer[..bytes_read]) {
-                Ok(_) => CopyService::increase_job_writes(job.clone()),
+                Ok(_) => StorageService::increment_job_writes(job.clone()),
                 Err(_) => {
-                    CopyService::update_job_status(job.clone(), JobStatus::Failed("Error writing to destination file".to_owned()));
-                    return Ok(CopyStats::new(job.clone(), Duration::from_secs(0)));
+                    StorageService::increment_job_writes(job.clone());
+                    return Ok(job.clone());
                 },
             }
 
@@ -90,12 +77,12 @@ impl CopyService {
             if *job.status.read().unwrap() == JobStatus::Suspended ||
                *job.status.read().unwrap() == JobStatus::Canceled {
                 destination.flush()?;
-                return Ok(CopyStats::new(job.clone(), Duration::from_secs(0)));
+                return Ok(job.clone());
             }
         }
 
         destination.flush()?;
-        Ok(CopyStats::new(job.clone(), Duration::from_secs(0)))
+        Ok(job.clone())
     }
 
     fn source_reader(config: &Arc<Config>, job: Arc<Job>) -> Result<BufReader<File>> {
@@ -118,86 +105,5 @@ impl CopyService {
             .open(&job.destination)?;
 
         Ok(BufWriter::new(destination))
-    }
-
-    fn subjobs(job: Arc<Job>) -> Vec<Arc<Job>> {
-        if CopyService::is_file(&job.source) {
-            return vec![job];
-        }
-
-        let source_paths = CopyService::visit_directory(Path::new(&job.source));
-        let mut destination_dirs: HashSet<String> = source_paths
-            .clone()
-            .into_iter()
-            .filter_map(|path| {
-              if CopyService::is_dir(&path) {
-                Some(path.replace(&job.source, &job.destination))
-              } else {
-                None 
-              } 
-            })
-            .collect();
-
-        destination_dirs.insert(job.destination.clone());
-
-        let subjobs: Vec<Arc<Job>> = source_paths
-            .iter()
-            .map(|path| {
-                let destination = path.replace(&job.source, &job.destination);
-                Arc::new(Job::new(
-                    path.to_owned(), 
-                    destination.clone(), 
-                    Some(job.clone()), 
-                    destination_dirs.clone()))
-            })
-            .collect();
-
-        subjobs
-    }
-
-    fn visit_directory(directory: &Path) -> Vec<String> {
-        std::fs::read_dir(directory)
-            .into_iter()
-            .flatten()
-            .filter_map(|entry| {
-                match entry {
-                    Ok(entry) => {
-                        let path = entry.path();
-                        match path.is_file() {
-                            true => Some(vec![path.to_str().unwrap().to_string()]),
-                            false if path.is_dir() => Some(CopyService::visit_directory(&path)),
-                            _ => None,
-                        }
-                    }
-                    Err(err) => {
-                        eprintln!("Unexpected error during directory walk, {}", err);
-                        None
-                    }
-                }
-            })
-            .flatten()
-            .collect()
-    }
-        
-    fn is_file(path: &str) -> bool {
-        metadata(path)
-            .map(|metadata| metadata.is_file())
-            .unwrap_or(false)
-    }
-
-    fn is_dir(path: &str) -> bool {
-        metadata(path)
-            .map(|metadata| metadata.is_dir())
-            .unwrap_or(false)
-    }
-
-    fn update_job_status(job: Arc<Job>, new_status: JobStatus) {
-        let mut status = job.status.write().unwrap();
-        *status = new_status;
-    }
-
-    fn increase_job_writes(job: Arc<Job>) {
-        let mut writes = job.writes.write().unwrap(); 
-        *writes += 1;
     }
 }

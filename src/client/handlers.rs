@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::mpsc::Sender;
@@ -11,13 +10,7 @@ use crate::services::storage::StorageService;
 
 pub fn handle_copy(request: CopyJobRequest, sender: Sender<Job>)
     -> Result<String> {
-    let job = Job::new(
-        request.source_path,
-        request.destination_path,
-        None,
-        HashSet::new(),
-    );
-
+    let job = Job::new(request.source_path,request.destination_path);
     match sender.send(job.clone()) {
         Ok(_) => 
             Ok(serde_json::to_string(&CopyResponse{ job_id: job.id.to_string() })?),

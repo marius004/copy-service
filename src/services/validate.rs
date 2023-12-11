@@ -15,7 +15,6 @@ fn are_paths_pointing_to_same_entity(source_path: &str, destination_path: &str) 
     }
 }
 
-
 pub fn validate(job: Arc<Job>) -> ValidationResult {
     if !Path::new(&job.source).exists() {
         return (false, String::from("Source path does not exist"));
