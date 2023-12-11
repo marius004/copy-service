@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::io::{Read, Seek, SeekFrom, Write, BufWriter, BufReader};
 use std::fs::{File, OpenOptions, metadata};
 use std::path::Path;
+use std::thread;
 use std::time::Duration;
 use anyhow::Result;
 use threadpool::ThreadPool;
@@ -84,6 +85,10 @@ impl CopyService {
                     CopyService::update_job_status(job.clone(), JobStatus::Failed("Error writing to destination file"));
                     return Ok(CopyStats::new(job.clone(), Duration::from_secs(0)));
                 },
+            }
+
+            if config.testing {
+                thread::sleep(Duration::from_secs_f32(config.delay));
             }
 
             if *job.status.read().unwrap() == JobStatus::Suspended ||

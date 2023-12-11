@@ -4,4 +4,7 @@ stdout_file = "./daemon/daemon.out"
 stderr_file = "./daemon/daemon.err"
 
 buffer_size = 128
-max_threads = 5
+max_threads = 2
+
+testing=true
+delay=0.5

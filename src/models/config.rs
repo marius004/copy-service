@@ -10,6 +10,9 @@ pub struct Config {
     
     pub buffer_size: usize,
     pub max_threads: usize,
+
+    pub testing: bool, 
+    pub delay: f32,
 }
 
 impl Config {
