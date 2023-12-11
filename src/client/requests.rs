@@ -95,7 +95,6 @@ pub fn parse_request(json_str: &str) -> Result<AnyRequest> {
             let list_request: ListRequest = serde_json::from_str(json_str)?;
             AnyRequest::List(list_request)
         }
-        _ => return Err(anyhow!("Unknown request type")),
     };
 
     Ok(result)
