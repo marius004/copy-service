@@ -2,7 +2,6 @@ use std::time::Duration;
 use std::sync::Arc;
 use super::job::Job;
 
-
 #[derive(Debug)]
 pub struct CopyStats {
     pub job: Arc<Job>,

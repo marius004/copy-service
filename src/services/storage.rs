@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::models::job::{Job, JobStatus};

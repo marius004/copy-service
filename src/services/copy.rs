@@ -1,18 +1,19 @@
-use std::sync::mpsc::Receiver;
-use std::collections::HashSet;
 use std::io::{Read, Seek, SeekFrom, Write, BufWriter, BufReader};
 use std::fs::{File, OpenOptions, metadata};
-use std::path::Path;
-use std::thread;
-use std::time::Duration;
+use std::sync::{Arc, RwLock, Mutex};
+use std::sync::mpsc::Receiver;
+use std::collections::HashSet;
 use anyhow::{Result, anyhow};
 use threadpool::ThreadPool;
+use std::time::Duration;
+use std::path::Path;
+use std::thread;
+
 use crate::services::storage::StorageService;
 use crate::models::job::{Job, JobStatus};
 use crate::models::copy::CopyStats;
 use crate::models::config::Config;
 use crate::services::validate::validate;
-use std::sync::{Arc, RwLock, Mutex};
 
 pub struct CopyService {
     config: Arc<Config>,

@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::{Arc, RwLockReadGuard}};
+use std::{fmt::Debug, sync::Arc};
 use serde::{Deserialize, Serialize};
 
 use crate::models::job::{Job, JobStatus};

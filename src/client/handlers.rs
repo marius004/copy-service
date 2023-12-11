@@ -2,13 +2,12 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::mpsc::Sender;
+use anyhow::Result;
 
 use crate::client::requests::*;
 use crate::client::responses::*;
-use crate::models::job::JobStatus;
 use crate::models::job::Job;
 use crate::services::storage::StorageService;
-use anyhow::Result;
 
 pub fn handle_copy(request: CopyJobRequest, sender: Sender<Job>)
     -> Result<String> {

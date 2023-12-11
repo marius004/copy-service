@@ -1,5 +1,4 @@
 use std::{fs, sync::Arc, path::Path};
-
 use crate::models::job::Job;
 
 type ValidationResult = (bool, String);
