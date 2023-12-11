@@ -5,19 +5,22 @@ use std::sync::{Arc, RwLock};
 
 use crate::client::handlers::*;
 use crate::client::requests::*;
+use crate::models::config::Config;
 use crate::models::job::Job;
 use crate::services::storage::StorageService;
 
 pub struct Client {
     storage: Arc<RwLock<StorageService>>,
     sender: Sender<Job>,
+    config: Arc<RwLock<Config>>,
 }
 
 impl Client {
-    pub fn new(storage: Arc<RwLock<StorageService>>, sender: Sender<Job>) -> Self {
+    pub fn new(storage: Arc<RwLock<StorageService>>, sender: Sender<Job>, config: Arc<RwLock<Config>>) -> Self {
         Client {
             storage,
             sender,
+            config,
         }
     }
 
@@ -57,9 +60,9 @@ impl Client {
                     AnyRequest::Cancel(cancel_request) =>
                         handle_cancel(cancel_request, self.storage.clone()),
                     AnyRequest::Progress(progress_request) => 
-                        handle_progress(progress_request, self.storage.clone()),
+                        handle_progress(progress_request, self.storage.clone(), self.config.clone()),
                     AnyRequest::List(_) => 
-                        handle_list(self.storage.clone()),
+                        handle_list(self.storage.clone(), self.config.clone()),
                 }
             }, 
             Err(err) => handle_error(err),

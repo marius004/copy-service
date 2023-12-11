@@ -18,9 +18,6 @@ class Test():
                 source=f"{PROJECT_DIRECTORY}/src/client/client.rs",
                 destination=f"{PROJECT_DIRECTORY}/daemon/tmp/client.rs"),
             CreateOperation(
-                source=f"{PROJECT_DIRECTORY}/src/models/copy.rs",
-                destination=f"{PROJECT_DIRECTORY}/daemon/tmp/copy-model.rs"),
-            CreateOperation(
                 source=f"{PROJECT_DIRECTORY}/src/models/job.rs",
                 destination=f"{PROJECT_DIRECTORY}/daemon/tmp/job.rs"),
             CreateOperation(
@@ -36,7 +33,8 @@ class Test():
         
         for _ in range(120): 
             for job in ListResponse.from_json(self.executor.exec(ListOperation())):
-                print(f"{job.id} -> {job.writes}")
+                percentage = 0 if job.percentage is None else job.percentage * 100
+                print(f"{job.id} -> {job.writes} ({percentage:.2f}%)")
             time.sleep(0.5)
             os.system("clear")
     
@@ -53,8 +51,56 @@ class Test():
 
             response = ProgressResponse.from_json(self.executor.exec(ProgressOperation(create_response.job_id)))
             print(response)
-
+            
+    def suspend(self):
+        requests = [
+            CreateOperation(
+                source=f"{PROJECT_DIRECTORY}/src/services/storage.rs",
+                destination=f"{PROJECT_DIRECTORY}/daemon/tmp/storage.rs"),
+        ]
+       
+        for request in requests:
+            create_response = CreateResponse.from_json(self.executor.exec(request))
+            print(create_response)
+            
+            response = ProgressResponse.from_json(self.executor.exec(ProgressOperation(create_response.job_id)))
+            print(response)
+            
+            time.sleep(5)
+            
+            response = SuspendResponse.from_json(self.executor.exec(SuspendOperation(create_response.job_id)))
+            print(response)
+            
+            response = ProgressResponse.from_json(self.executor.exec(ProgressOperation(create_response.job_id)))
+            print(response)
+            
+    def cancel(self):
+        requests = [
+            CreateOperation(
+                source=f"{PROJECT_DIRECTORY}/src/services/storage.rs",
+                destination=f"{PROJECT_DIRECTORY}/daemon/tmp/storage.rs"),
+        ]
+    
+        for request in requests:
+            create_response = CreateResponse.from_json(self.executor.exec(request))
+            print(create_response)
+            
+            response = ProgressResponse.from_json(self.executor.exec(ProgressOperation(create_response.job_id)))
+            print(response)
+            
+            time.sleep(3)
+            
+            response = SuspendResponse.from_json(self.executor.exec(SuspendOperation(create_response.job_id)))
+            print(response)
+             
+            os.system("clear")
+            for job in ListResponse.from_json(self.executor.exec(ListOperation())):
+                percentage = 0 if job.percentage is None else job.percentage * 100
+                print(f"{job.id} -> {job.writes} ({percentage:.2f}%)")
+        
 test = Test(Executor(DAEMON_HOST, DAEMON_PORT))
 
-test.create_multiple_files()
+# test.create_multiple_files()
 # test.create_source_path_does_not_exist()
+# test.suspend()
+test.cancel()

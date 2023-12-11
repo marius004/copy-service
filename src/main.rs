@@ -12,12 +12,12 @@ use models::{config::Config, job::Job};
 use client::client::Client;
 use services::{storage::StorageService, copy::CopyService};
 
-fn run(config: Arc<Config>) {
+fn run(config: Config) {
     let (sender, receiver) = channel::<Job>();
     
     let storage_service = Arc::new(RwLock::new(StorageService::new()));
-    let copy_service =  Arc::new(RwLock::new(CopyService::new(config, Mutex::new(receiver), storage_service.clone())));
-    let client_service = Arc::new(Mutex::new(Client::new(storage_service.clone(), sender)));
+    let copy_service =  Arc::new(RwLock::new(CopyService::new(Arc::new(config.clone()), Mutex::new(receiver), storage_service.clone())));
+    let client_service = Arc::new(Mutex::new(Client::new(storage_service.clone(), sender,  Arc::new(RwLock::new(config.clone())))));
 
     let client_handle = thread::spawn(move || {
         client_service.lock().unwrap().listen();
@@ -46,7 +46,7 @@ fn main() {
         .stderr(stderr);
 
     match daemonize.start() {
-        Ok(_) => run(Arc::new(config)),
+        Ok(_) => run(config),
         Err(err) => eprintln!("Error, {}", err),
     }
 }

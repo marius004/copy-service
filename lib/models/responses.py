@@ -31,8 +31,8 @@ class SuspendResponse(BaseResponse):
     @staticmethod
     def from_json(obj: dict) -> 'SuspendResponse':
         if "error" in obj.get("message", "").lower(): 
-            return SuspendResponse(type=ResponseType.SUSPEND, error=obj["message"])
-        return SuspendResponse(type=ResponseType.SUSPEND, message=obj["message"])
+            return SuspendResponse(type=ResponseType.SUSPEND, error=obj["message"], message="")
+        return SuspendResponse(type=ResponseType.SUSPEND, message=obj["message"], error="")
 
 @dataclass
 class CancelResponse(BaseResponse):
@@ -41,8 +41,8 @@ class CancelResponse(BaseResponse):
     @staticmethod
     def from_json(obj: dict) -> 'CancelResponse':
         if "error" in obj.get("message", "").lower(): 
-            return CancelResponse(type=ResponseType.CANCEL, error=obj["message"])
-        return CancelResponse(type=ResponseType.CANCEL, message=obj["message"])
+            return CancelResponse(type=ResponseType.CANCEL, error=obj["message"], message="")
+        return CancelResponse(type=ResponseType.CANCEL, message=obj["message"], error="")
 
 @dataclass
 class JobResponse(BaseResponse):
@@ -51,6 +51,7 @@ class JobResponse(BaseResponse):
     destination: str 
     status: str
     writes: str
+    percentage: float
     
     @staticmethod
     def from_json(obj: dict, type: ResponseType) -> 'JobResponse':
@@ -61,7 +62,8 @@ class JobResponse(BaseResponse):
             source=obj.get('source', None),
             destination=obj.get('destination', None),
             status=obj.get('status', None),
-            writes=obj.get('writes', None)
+            writes=obj.get('writes', 0), 
+            percentage=obj.get('percentage', 0),
         )
     
 @dataclass

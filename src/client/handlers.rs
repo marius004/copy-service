@@ -5,6 +5,7 @@ use anyhow::Result;
 
 use crate::client::requests::*;
 use crate::client::responses::*;
+use crate::models::config::Config;
 use crate::models::job::Job;
 use crate::services::storage::StorageService;
 
@@ -39,16 +40,16 @@ pub fn handle_cancel(request: CancelJobRequest, storage_service: Arc<RwLock<Stor
     }
 }
 
-pub fn handle_progress(request: ProgressJobRequest, storage_service: Arc<RwLock<StorageService>>) -> Result<String> {
+pub fn handle_progress(request: ProgressJobRequest, storage_service: Arc<RwLock<StorageService>>, config: Arc<RwLock<Config>>) -> Result<String> {
     match storage_service.read().unwrap().job(request.job_id.clone()) {
         Some(stats) => 
-            Ok(serde_json::to_string(&JobResponse::from_job(&stats))?),
+            Ok(serde_json::to_string(&JobResponse::from_job(&stats, config))?),
         None => 
            Ok(serde_json::to_string(&ErrorMessageResponse { message: format!("Could not find job {}", request.job_id) })?),
     }
 }
 
-pub fn handle_list(storage_service: Arc<RwLock<StorageService>>) -> Result<String> {
+pub fn handle_list(storage_service: Arc<RwLock<StorageService>>, config: Arc<RwLock<Config>>) -> Result<String> {
     let active_jobs: Vec<_> = 
         storage_service
             .read()
@@ -63,7 +64,7 @@ pub fn handle_list(storage_service: Arc<RwLock<StorageService>>) -> Result<Strin
     let response: Vec<_> = 
         active_jobs
             .iter()
-            .map(|job| JobResponse::from_job(job))
+            .map(|job| JobResponse::from_job(job, config.clone()))
             .collect();
 
     Ok(serde_json::to_string(&response)?)
