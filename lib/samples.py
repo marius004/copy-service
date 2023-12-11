@@ -56,5 +56,5 @@ class Test():
 
 test = Test(Executor(DAEMON_HOST, DAEMON_PORT))
 
-# test.create_multiple_files()
-test.create_source_path_does_not_exist()
+test.create_multiple_files()
+# test.create_source_path_does_not_exist()

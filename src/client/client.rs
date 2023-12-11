@@ -32,16 +32,17 @@ impl Client {
     }
 
     fn handle_stream(&self, mut stream: TcpStream) {
-        // todo: change this with some resizable container
-        let mut buffer = vec![0u8; 4096];
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.resize(65536, 0);
 
         while let Ok(bytes_read) = stream.read(&mut buffer) {
             if bytes_read == 0 {
                 break;
             }
-
+            
             let request = String::from_utf8_lossy(&buffer[..bytes_read]);
             self.send_response(&mut stream,&self.handle_request(&request));
+            buffer.resize(65536, 0)
         }
     }
 
