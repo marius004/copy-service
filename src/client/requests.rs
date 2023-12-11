@@ -58,6 +58,7 @@ pub struct ListRequest {
     pub base: JobRequest,
 }
 
+#[derive(Debug)]
 pub enum AnyRequest {
     Copy(CopyJobRequest),
     Suspend(SuspendJobRequest),

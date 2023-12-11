@@ -48,7 +48,7 @@ impl Client {
     fn handle_request(&self, request: &str) -> Option<String> {
         let response = match parse_request(request) {
             Ok(parsed_request) => {
-                let response = match parsed_request {
+                match parsed_request {
                     AnyRequest::Copy(copy_request) => 
                         handle_copy(copy_request, self.sender.clone()),
                     AnyRequest::Suspend(suspend_request) =>
@@ -59,17 +59,15 @@ impl Client {
                         handle_progress(progress_request, self.storage.clone()),
                     AnyRequest::List(_) => 
                         handle_list(self.storage.clone()),
-                };
-
-                match response {
-                    Ok(str) => Some(str),
-                    Err(err) => Some(err.to_string()),
                 }
-            }
-            Err(_) => None,
+            }, 
+            Err(err) => handle_error(err),
         };
 
-        response
+        match response {
+            Ok(str) => Some(str), 
+            Err(err) => Some(err.to_string()),
+        }
     }
 
     fn send_response(&self, stream: &mut TcpStream, response: &Option<String>) {

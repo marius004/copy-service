@@ -10,7 +10,7 @@ use crate::models::job::Job;
 use crate::services::storage::StorageService;
 use anyhow::Result;
 
-pub fn handle_copy(request: CopyJobRequest, job_sender: Sender<Job>)
+pub fn handle_copy(request: CopyJobRequest, sender: Sender<Job>)
     -> Result<String> {
     let job = Job::new(
         request.source_path,
@@ -19,7 +19,7 @@ pub fn handle_copy(request: CopyJobRequest, job_sender: Sender<Job>)
         HashSet::new(),
     );
 
-    match job_sender.send(job.clone()) {
+    match sender.send(job.clone()) {
         Ok(_) => 
             Ok(serde_json::to_string(&CopyResponse{ job_id: job.id.to_string() })?),
         Err(err) => 
@@ -66,15 +66,6 @@ pub fn handle_list(storage_service: Arc<RwLock<StorageService>>) -> Result<Strin
             .unwrap()
             .clone()
             .into_iter()
-            .filter(|job| {
-                matches!(*job.status.read().unwrap(), 
-                    JobStatus::Created |
-                    JobStatus::Running |
-                    JobStatus::Failed(_) |
-                    JobStatus::Suspended |
-                    JobStatus::Canceled
-                )
-            })
             .collect();
 
     let response: Vec<_> = 
@@ -84,4 +75,8 @@ pub fn handle_list(storage_service: Arc<RwLock<StorageService>>) -> Result<Strin
             .collect();
 
     Ok(serde_json::to_string(&response)?)
+}
+
+pub fn handle_error(error: anyhow::Error) -> Result<String> {
+    Ok(serde_json::to_string(&ErrorMessageResponse { message:error.to_string() })?)
 }

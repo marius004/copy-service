@@ -5,12 +5,13 @@ use std::fs::{File, OpenOptions, metadata};
 use std::path::Path;
 use std::thread;
 use std::time::Duration;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use threadpool::ThreadPool;
 use crate::services::storage::StorageService;
 use crate::models::job::{Job, JobStatus};
 use crate::models::copy::CopyStats;
 use crate::models::config::Config;
+use crate::services::validate::validate;
 use std::sync::{Arc, RwLock, Mutex};
 
 pub struct CopyService {
@@ -39,18 +40,8 @@ impl CopyService {
                 let config_clone = Arc::clone(&self.config);
 
                 self.workers.execute(move || {
-                    let result = CopyService::execute_job(&config_clone, job);
-                    match result {
-                        Ok(stats) => {
-                            println!("{:#?}", stats);
-                            let mut job_status = stats.job.status.write().unwrap();
-                            *job_status = JobStatus::Completed;
-                        }
-                        Err(err) => {
-                            // todo: handle error
-                            eprintln!("Unexpected error, {}", err);
-                            // *job_status = JobStatus::Failed(err.to_string());
-                        }
+                    if let Err(err) = CopyService::execute_job(&config_clone, job.clone()) {
+                        CopyService::update_job_status(job, JobStatus::Failed(err.to_string()));
                     }
                 });
             }
@@ -58,13 +49,16 @@ impl CopyService {
     }
     
     fn execute_job(config: &Arc<Config>, job: Arc<Job>) -> Result<CopyStats> {
+        CopyService::update_job_status(job.clone(), JobStatus::Running);
+
+        if let(false, message) = validate(job.clone()) {
+            return Err(anyhow!(message));
+        }
+
         // create all destination directories 
         for dir_path in &job.destination_dirs {
-            println!("Destination {}", dir_path);
-            
             if let Err(err) = std::fs::create_dir_all(dir_path) {
                 if err.kind() != std::io::ErrorKind::AlreadyExists {
-                    eprintln!("Error creating directory {}: {}", dir_path, err);
                     return Err(err.into());
                 }
             }
@@ -76,13 +70,14 @@ impl CopyService {
         let mut buffer: Vec<u8> = vec![0; config.buffer_size.clone()];
         while let Ok(bytes_read) = source.read(&mut buffer) {
             if bytes_read == 0 {
+                CopyService::update_job_status(job.clone(), JobStatus::Completed);
                 break;
             }
 
             match destination.write_all(&buffer[..bytes_read]) {
                 Ok(_) => CopyService::increase_job_writes(job.clone()),
                 Err(_) => {
-                    CopyService::update_job_status(job.clone(), JobStatus::Failed("Error writing to destination file"));
+                    CopyService::update_job_status(job.clone(), JobStatus::Failed("Error writing to destination file".to_owned()));
                     return Ok(CopyStats::new(job.clone(), Duration::from_secs(0)));
                 },
             }

@@ -1,7 +1,7 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::{Arc, RwLockReadGuard}};
 use serde::{Deserialize, Serialize};
 
-use crate::models::job::Job;
+use crate::models::job::{Job, JobStatus};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorMessageResponse {
@@ -35,14 +35,22 @@ pub struct JobResponse {
 
 impl JobResponse {
     pub fn from_job(job: &Arc<Job>) -> Self {
-        let status = *job.status.read().unwrap();
+        let job_clone = job.clone();
         let writes = *job.writes.read().unwrap();
+
+        let status = {
+            let status_guard = job_clone.status.read().unwrap();
+            match &*status_guard {
+                JobStatus::Failed(message) => format!("failed: {}", message),
+                other => format!("{:?}", other),
+            }
+        };
         
         JobResponse { 
             id: job.id.to_string(),
             source: job.source.clone(), 
             destination: job.destination.clone(),
-            status: format!("{:#?}", status),
+            status: status,
             writes: writes,
         }
     }

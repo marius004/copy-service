@@ -1,4 +1,4 @@
-use std::{sync::{Arc, RwLock}, collections::HashSet};
+use std::{sync::{Arc, RwLock}, collections::HashSet, borrow::Cow};
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
@@ -14,14 +14,14 @@ pub struct Job {
     pub destination_dirs: HashSet<String>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum JobStatus {
     Created,
     Running,
     Suspended,
     Completed,
     Canceled,
-    Failed(&'static str),
+    Failed(String),
 }
 
 impl Job {
