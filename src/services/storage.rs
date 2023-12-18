@@ -26,6 +26,17 @@ impl StorageService {
             .is_some()
     }
 
+    pub fn resume_job(&mut self, job_id: String) -> bool {
+        Uuid::from_str(&job_id)
+            .ok()
+            .and_then(|uuid| self.jobs.write().unwrap().iter_mut().find(|job| job.id == uuid).cloned())
+            .map(|job| {
+                let mut status = job.status.write().unwrap();
+                *status = JobStatus::Resumed;
+            })
+            .is_some()
+    }
+
     pub fn cancel_job(&mut self, job_id: String) -> bool {
         Uuid::from_str(&job_id)
             .ok()

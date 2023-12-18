@@ -8,6 +8,7 @@ class OperationType(Enum):
     CANCEL = 2,
     PROGRESS = 3, 
     LIST = 4
+    RESUME = 5,
 
 class BaseOperation(ABC): 
     @abstractmethod
@@ -41,6 +42,17 @@ class SuspendOperation(BaseOperation):
 
     def repr(self) -> str:
         return f'{{"request_type": "suspend", "job_id": "{self.job_id}"}}'
+
+@dataclass
+class ResumeOperation(BaseOperation):
+    def __init__(self, job_id: str): 
+        self.job_id = job_id
+    
+    def type(self) -> OperationType:
+        return OperationType.RESUME
+
+    def repr(self) -> str:
+        return f'{{"request_type": "resume", "job_id": "{self.job_id}"}}'
 
 @dataclass
 class CancelOperation(BaseOperation):

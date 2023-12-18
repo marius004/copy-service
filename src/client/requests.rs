@@ -11,6 +11,7 @@ pub enum JobRequestType {
     Suspend,
     Progress,
     List, 
+    Resume,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,6 +37,14 @@ pub struct SuspendJobRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ResumeJobRequest {
+    #[serde(flatten)]
+    pub base: JobRequest,
+
+    pub job_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CancelJobRequest {
     #[serde(flatten)]
     pub base: JobRequest,
@@ -52,7 +61,7 @@ pub struct ProgressJobRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ListRequest {
+pub struct ListJobsRequest {
     #[serde(flatten)]
     pub base: JobRequest,
 }
@@ -63,7 +72,8 @@ pub enum AnyRequest {
     Suspend(SuspendJobRequest),
     Cancel(CancelJobRequest),
     Progress(ProgressJobRequest),
-    List(ListRequest),
+    List(ListJobsRequest),
+    Resume(ResumeJobRequest),
 }
 
 pub fn parse_request(json_str: &str) -> Result<AnyRequest> {
@@ -92,8 +102,12 @@ pub fn parse_request(json_str: &str) -> Result<AnyRequest> {
             AnyRequest::Progress(progress_request)
         }
         JobRequestType::List => {
-            let list_request: ListRequest = serde_json::from_str(json_str)?;
+            let list_request: ListJobsRequest = serde_json::from_str(json_str)?;
             AnyRequest::List(list_request)
+        }, 
+        JobRequestType::Resume => {
+            let resume_request: ResumeJobRequest = serde_json::from_str(json_str)?;
+            AnyRequest::Resume(resume_request)
         }
     };
 

@@ -8,6 +8,7 @@ class ResponseType(Enum):
     CANCEL = 2
     PROGRESS = 3
     LIST = 4
+    RESUME = 5, 
 
 @dataclass
 class BaseResponse:
@@ -33,6 +34,16 @@ class SuspendResponse(BaseResponse):
         if "error" in obj.get("message", "").lower(): 
             return SuspendResponse(type=ResponseType.SUSPEND, error=obj["message"], message="")
         return SuspendResponse(type=ResponseType.SUSPEND, message=obj["message"], error="")
+
+@dataclass
+class ResumeResponse(BaseResponse):
+    message: str
+
+    @staticmethod
+    def from_json(obj: dict) -> 'SuspendResponse':
+        if "error" in obj.get("message", "").lower(): 
+            return ResumeResponse(type=ResponseType.RESUME, error=obj["message"], message="")
+        return ResumeResponse(type=ResponseType.RESUME, message=obj["message"], error="")
 
 @dataclass
 class CancelResponse(BaseResponse):

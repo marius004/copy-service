@@ -74,10 +74,18 @@ impl CopyService {
                 thread::sleep(Duration::from_secs_f32(config.delay));
             }
 
-            if *job.status.read().unwrap() == JobStatus::Suspended ||
-               *job.status.read().unwrap() == JobStatus::Canceled {
+            if *job.status.read().unwrap() == JobStatus::Canceled {
                 destination.flush()?;
                 return Ok(job.clone());
+            } 
+
+            if *job.status.read().unwrap() == JobStatus::Suspended {
+                destination.flush()?;
+
+                while *job.status.read().unwrap() != JobStatus::Resumed {
+                    thread::yield_now();
+                    thread::sleep(Duration::from_secs_f32(config.delay));
+                }                   
             }
         }
 

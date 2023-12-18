@@ -63,6 +63,8 @@ impl Client {
                         handle_progress(progress_request, self.storage.clone(), self.config.clone()),
                     AnyRequest::List(_) => 
                         handle_list(self.storage.clone(), self.config.clone()),
+                    AnyRequest::Resume(resume_request) => 
+                        handle_resume(resume_request, self.storage.clone()),
                 }
             }, 
             Err(err) => handle_error(err),

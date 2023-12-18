@@ -19,6 +19,11 @@ pub struct SuspendResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ResumeResponse {
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CancelResponse {
     pub message: String,
 }

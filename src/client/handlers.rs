@@ -31,6 +31,17 @@ pub fn handle_suspend(request: SuspendJobRequest, storage_service: Arc<RwLock<St
     }
 }
 
+pub fn handle_resume(request: ResumeJobRequest, storage_service: Arc<RwLock<StorageService>>) 
+    -> Result<String> {
+    
+    match storage_service.write().unwrap().resume_job(request.job_id.clone()) {
+        true => 
+            Ok(serde_json::to_string(&ResumeResponse { message: format!("Job {} resumed successfully", request.job_id) })?),
+        false => 
+            Ok(serde_json::to_string(&ResumeResponse { message: format!("Could not resume job {}", request.job_id) })?),
+    }
+}
+
 pub fn handle_cancel(request: CancelJobRequest, storage_service: Arc<RwLock<StorageService>>) -> Result<String> {
     match storage_service.write().unwrap().cancel_job(request.job_id.clone()) {
         true => 

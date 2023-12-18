@@ -15,6 +15,7 @@ pub enum JobStatus {
     Created,
     Running,
     Suspended,
+    Resumed, 
     Completed,
     Canceled,
     Failed(String),
